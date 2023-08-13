@@ -4,133 +4,139 @@ This is a wrapper for the glfwNative library
 
 The purpose of this library is to wrap glfw natives to a more scheme friendly environment
 
-gsc  -cc-options "-framework Cocoa -framework OpenGL -lglfw3 -framework CoreVideo -framework IOKit -x objective-c -I/usr/local/include -I/System/Library/Frameworks/CoreVideo.framework -I/System/Library/Frameworks/IOKit.framework -I/System/Library/Frameworks/Cocoa.framework -I/System/Library/Frameworks/OpenGL.framework -L/Users/tomasmore/Downloads/glfw-3.0.4/build/src/ "  glfw.scm
-gsc  -cc-options "-framework Cocoa -lglfw3 -lGLEW -framework CoreVideo -framework IOKit -x objective-c -I/usr/local/include -I/System/Library/Frameworks/CoreVideo.framework -I/System/Library/Frameworks/IOKit.framework -I/System/Library/Frameworks/Cocoa.framework -L/Users/tomasmore/Downloads/glfw-3.0.4/build/src/ "  glfw.scm
+gsc  -cc-options "-framework Cocoa -framework OpenGL -lglfw3 -framework CoreVideo -framework IOKit -x objective-c -I/usr/local/include -I/System/Library/Frameworks/CoreVideo.framework -I/System/Library/Frameworks/IOKit.framework -I/System/Library/Frameworks/Cocoa.framework -I/System/Library/Frameworks/OpenGL.framework -L/path/to/glfw/build/src/" glfw.scm
+gsc  -cc-options "-framework Cocoa -lglfw3 -lGLEW -framework CoreVideo -framework IOKit -x objective-c -I/usr/local/include -I/System/Library/Frameworks/CoreVideo.framework -I/System/Library/Frameworks/IOKit.framework -I/System/Library/Frameworks/Cocoa.framework -L/path/to/glfw/build/src/" glfw.scm
 ||#
 
 (include "glfwNative.scm")
 (include "glfwConstantConverter.scm")
 
-;; to compare all the diffrent windows that we can make we need to be able to tell the windows from eachother.
-;: we do this by getting the pointer number
-(define  glfw#get-glfw-window-pointer      (c-lambda (GLFWwindow*) int "___result = ___arg1;"))
-(define glfw#get-window-pointer (lambda (window) (glfw#get-glfw-window-pointer (##vector-ref window 1))))
+;; to compare all the different windows that we can make we need to be able to tell the windows from each other.
+;; we do this by getting the pointer number
+(define glfw#get-glfw-window-pointer
+  (c-lambda (GLFWwindow*) int "___result = ___arg1;"))
+(define pointer-equal?
+  (c-lambda (GLFWwindow* GLFWwindow*) bool "___return(___arg1 == ___arg2);"))
+(define glfw#get-window-pointer
+  (lambda (window) (glfw#get-glfw-window-pointer (##vector-ref window 1))))
+
 #|| ERROR CALLBACK ||#
-(define   glfw-error-procedure-holder #f)
-(c-define (glfw#error-callback-procedure error-code error-msg)(int nonnull-UTF-8-string) void "gambitErrorCallback" ""
-          (if  glfw-error-procedure-holder
-              (glfw-error-procedure-holder error-code error-msg)
-              )
-          #f
-          )
+(define glfw-error-procedure-holder #f)
+(c-define (glfw#error-callback-procedure error-code error-msg)
+          (int nonnull-UTF-8-string) void "gambitErrorCallback" ""
+          (if glfw-error-procedure-holder
+              (glfw-error-procedure-holder error-code error-msg))
+          #f)
 
 (define (glfw#set-error-callback procedure)
   (if (procedure? procedure)
       (begin
         (set!  glfw-error-procedure-holder procedure)
-        (glfw-native#set-error-callback glfw#error-callback-procedure)
-        )
+        (glfw-native#set-error-callback glfw#error-callback-procedure))
       (begin
         (set!  glfw-error-procedure-holder #f)
-        (glfw-native#set-error-callback #f)
-        )))
+        (glfw-native#set-error-callback #f))))
 
 #|| HINTS ||#
 (define glfw#default-window-hint glfw-native#default-window-hint)
-(define glfw#window-hint (lambda (hint hint-value) (glfw-native#window-hint (symbol->glfw-hint hint) (symbol->glfw-hint-value hint-value))))
+(define glfw#window-hint
+  (lambda (hint hint-value)
+    (glfw-native#window-hint (symbol->glfw-hint hint) (symbol->glfw-hint-value hint-value))))
+
 #|| INIT ||#
 (define glfw-initiated? #f)
-
 
 ;; Table of all windows created
 ;; this will mainly help the event procedures to find the correct window
 ;; key is the glfw-native#window* value is a scheme glfw#window
-;; we need the equa test checker too see if windows are equal                                            
-(define glfw#windows (make-table test: equal?))
+
+;; Originally `equal?` but seems to need `pointer-equal?`
+
+(define glfw#windows (make-table test: pointer-equal?))
 
 (define (glfw#init)
   (if (not glfw-initiated?)
       (let ((inited? (glfw-native#init)))
         (set! glfw-initiated? inited?)
-        inited?
-        )#f))
+        inited?)
+      #f))
 
 (define (glfw#terminate)
   (or (not glfw-initiated?)
       (begin
-      (glfw-native#terminate)
-        (table-for-each (lambda (key val) 
-                          (table-set! glfw#windows key)
-                          ) glfw#windows) 
-        )
-      )
-  )
+        (glfw-native#terminate)
+        (table-for-each
+         (lambda (key val) (table-set! glfw#windows key))
+         glfw#windows))))
 
-#|| WIDNOW HANDLERS ||#
-
+#|| WINDOW HANDLERS ||#
 (define-type glfw#window
+  constructor: glfw#make-window-type
+  instance
+  ;; the following slots prefixed with "on" should be #f or a procedure
+  ;; default for all is #f
+  ;; if this is a procedure all of the agruments are given an instance of the type itself
+  ;; plus the extra information needed
 
-             constructor: glfw#make-window-type
-             instance
-             ;; the following slots prefixed with "on" should be #f or a procedure
-             ;; default for all is #f
-             ;; if this is a procedure all of the agruments are given an instance of the type itself
-             ;; plus the extra information needed
+  (on-close               read-only: init: #f)
+  (on-refresh             read-only: init: #f)
+  (on-resize              read-only: init: #f)
+  (on-iconify             read-only: init: #f)
+  (on-reposition          read-only: init: #f)
+  (on-focus               read-only: init: #f)
+  (on-mouse-click         read-only: init: #f)
+  (on-cursor-move         read-only: init: #f)
+  (on-mouse-enter         read-only: init: #f)
+  (on-scroll              read-only: init: #f)
+  (on-key-press           read-only: init: #f)
+  (on-char-press          read-only: init: #f)
+  (on-framebuffer-resize  read-only: init: #f)
+  ;; utilities
+  ;; because there are no native get title procedure 
+  (title                  read-only:))
 
-             (on-close               read-only: init: #f)
-             (on-refresh             read-only: init: #f)
-             (on-resize              read-only: init: #f)
-             (on-iconify             read-only: init: #f)
-             (on-reposition          read-only: init: #f)
-             (on-focus               read-only: init: #f)
-             (on-mouse-click         read-only: init: #f)
-             (on-cursor-move         read-only: init: #f)
-             (on-mouse-enter         read-only: init: #f)
-             (on-scroll              read-only: init: #f)
-             (on-key-press           read-only: init: #f)
-             (on-char-press          read-only: init: #f)
-             (on-framebuffer-resize  read-only: init: #f)
-             ;; utilities
-
-             ;; because there are no native get title procedure 
-             (title                  read-only:)
-             )
 (define-macro (get-glfw-window window)
-  `(if (glfw#window? ,window) (##vector-ref ,window 1) ,window)
-  )
+  `(if (glfw#window? ,window) (##vector-ref ,window 1) ,window))
 (define-macro (get-scheme-window window)
   `(or (table-ref glfw#windows ,window #f) (error "Invalid glfw window")))
 
 ;; The following c-defines are what wrapps the c event listeners to scheme
-(c-define (glfw#on-close glfw-window)(GLFWwindow*) void "gambitGLFWonError" ""
+(c-define (glfw#on-close glfw-window)
+          (GLFWwindow*) void "gambitGLFWonError" ""
           (let ((window (get-scheme-window glfw-window)))
             ((##vector-ref window 2) window)
             )#f)
-(c-define (glfw#on-refresh glfw-window)(GLFWwindow*) void "gambitGLFWonRefresh" ""
+(c-define (glfw#on-refresh glfw-window)
+          (GLFWwindow*) void "gambitGLFWonRefresh" ""
           (let ((window (get-scheme-window glfw-window)))
             ((##vector-ref window 3) window)
             )#f)
-(c-define (glfw#on-resize glfw-window new-width new-height)(GLFWwindow* int int) void "gambitGLFWonResize" ""
+(c-define (glfw#on-resize glfw-window new-width new-height)
+          (GLFWwindow* int int) void "gambitGLFWonResize" ""
           (let ((window (get-scheme-window glfw-window)))
             (##vector-set! window 17 new-width)
             (##vector-set! window 18 new-height)
             ((##vector-ref window 4) window new-width new-height)
             )#f)
-(c-define (glfw#on-iconify glfw-window iconified?)(GLFWwindow* bool) void "gambitGLFWonIconify" ""
+(c-define (glfw#on-iconify glfw-window iconified?)
+          (GLFWwindow* bool) void "gambitGLFWonIconify" ""
           (let ((window (get-scheme-window glfw-window)))
             (##vector-set! window 19 iconified?)
             ((##vector-ref window 5) window iconified?)
             )#f)
-(c-define (glfw#on-reposition glfw-window x-position y-position)(GLFWwindow* int int) void "gambitGLFWonRespos" ""
+(c-define (glfw#on-reposition glfw-window x-position y-position)
+          (GLFWwindow* int int) void "gambitGLFWonRespos" ""
           (let ((window (get-scheme-window glfw-window)))
             ((##vector-ref window 6) window x-position y-position)
             ) #f)
-(c-define (glfw#on-focus glfw-window focused?)(GLFWwindow* bool) void "gambitGLFWonFocus" ""
+(c-define (glfw#on-focus glfw-window focused?)
+          (GLFWwindow* bool) void "gambitGLFWonFocus" ""
           (let ((window (get-scheme-window glfw-window)))
             ((##vector-ref window 7) window focused?)
             )#f)
 
-(c-define (glfw#on-mouse-click glfw-window button action modifier)(GLFWwindow* int int int) void "gambitGLFWonMouseClick" ""
+(c-define (glfw#on-mouse-click glfw-window button action modifier)
+          (GLFWwindow* int int int) void "gambitGLFWonMouseClick" ""
           (let ((window (get-scheme-window glfw-window)))
             ((##vector-ref window 8) 
              window 
@@ -138,27 +144,31 @@ gsc  -cc-options "-framework Cocoa -lglfw3 -lGLEW -framework CoreVideo -framewor
              (glfw-action->symbol       action)
              (glfw-mod-key->symbol      modifier)
              ))#f)
-(c-define (glfw#on-cursor-move glfw-window x-pos y-pos)(GLFWwindow* double double) void "gambitGLFWonMousePos" ""
+(c-define (glfw#on-cursor-move glfw-window x-pos y-pos)
+          (GLFWwindow* double double) void "gambitGLFWonMousePos" ""
           (let ((window (get-scheme-window glfw-window)))
             ((##vector-ref window 9) 
              window 
              x-pos
              y-pos
              ))#f)
-(c-define (glfw#on-mouse-enter glfw-window enter?)(GLFWwindow* bool) void "gambitGLFWonMouseEnter" ""
+(c-define (glfw#on-mouse-enter glfw-window enter?)
+          (GLFWwindow* bool) void "gambitGLFWonMouseEnter" ""
           (let ((window (get-scheme-window glfw-window)))
             ((##vector-ref window 10)
              window
              enter?
              )) #f)
-(c-define (glfw#on-scroll glfw-window x-offset y-offset)(GLFWwindow* double double) void "gambitGLFWonScroll" ""
+(c-define (glfw#on-scroll glfw-window x-offset y-offset)
+          (GLFWwindow* double double) void "gambitGLFWonScroll" ""
           (let ((window (get-scheme-window glfw-window)))
             ((##vector-ref window 11)
              window
              x-offset
              y-offset
              ))#f)
-(c-define (glfw#on-key-press glfw-window key scancode action mods)(GLFWwindow* int int int int) void "gambitGLFWonKey" ""
+(c-define (glfw#on-key-press glfw-window key scancode action mods)
+          (GLFWwindow* int int int int) void "gambitGLFWonKey" ""
           (let ((window (get-scheme-window glfw-window)))
             ((##vector-ref window 12)
              window
@@ -167,13 +177,15 @@ gsc  -cc-options "-framework Cocoa -lglfw3 -lGLEW -framework CoreVideo -framewor
              (glfw-action->symbol action)
              (if (eq? mods 0) #f (glfw-mod-key->symbol mods))
              ))#f)
-(c-define (glfw#on-char-press glfw-window utf-8-integer)(GLFWwindow* int) void "gambitGLFWonCharPress" ""          
+(c-define (glfw#on-char-press glfw-window utf-8-integer)
+          (GLFWwindow* int) void "gambitGLFWonCharPress" ""          
           (let ((window (get-scheme-window glfw-window)))
             ((##vector-ref window 13)
              window
              (integer->char utf-8-integer)
              ))#f)
-(c-define (glfw#on-framebuffer-resize glfw-window width height)(GLFWwindow* int int) void "gambitGLFWonFrameBufferResize" ""
+(c-define (glfw#on-framebuffer-resize glfw-window width height)
+          (GLFWwindow* int int) void "gambitGLFWonFrameBufferResize" ""
           (let ((window (get-scheme-window glfw-window)))
             ((##vector-ref window 14)
              window
@@ -181,7 +193,6 @@ gsc  -cc-options "-framework Cocoa -lglfw3 -lGLEW -framework CoreVideo -framewor
              height
              ))#f)
 
-              
 ;; Setters for the diffrent event callback procedures
 ;; what realy happends is is that we bind a scheme procedure to the glfw#window specifi slot
 ;; then we tell glfw to use one of the procedures defined above.
@@ -190,7 +201,7 @@ gsc  -cc-options "-framework Cocoa -lglfw3 -lGLEW -framework CoreVideo -framewor
 (define  (glfw#window-on-close-set! window value)
   (glfw-native#set-window-close-callback (glfw#window-instance window) (if value glfw#on-close #f))
   (##vector-set! window 2 value))
-                                 
+
 (define  (glfw#window-on-refresh-set! window value)
   (glfw-native#set-window-refresh-callback (glfw#window-instance window) (if value glfw#on-refresh #f))
   (##vector-set! window 3 value))
@@ -238,25 +249,22 @@ gsc  -cc-options "-framework Cocoa -lglfw3 -lGLEW -framework CoreVideo -framewor
   (glfw-native#set-framebuffer-size-callback (glfw#window-instance window) (if value glfw#on-framebuffer-resize #f))
   (##vector-set! window 14 value))
 
-
 ;; This is the procedure to create a window
 ;; it returns an instace of glfw#window
 ;; as a little sugar I made it such that if GLFW isn't initiated it does so automaticly
 (define (glfw#make-window width height title
-             #!key
-             (monitor #f)
-             (share   #f)
-             )
+                          #!key
+                          (monitor #f)
+                          (share   #f))
   ;; just as a helper we init glfw if it isn' allready so
   (or glfw-initiated? (glfw#init))
   (let* ((glfw-window (glfw-native#create-window width height title monitor share))
          (window (glfw#make-window-type
-                      glfw-window title)))
+                  glfw-window title)))
     (table-set! glfw#windows glfw-window window)
-    window
-    ))
+    window))
 
-;; the destroy window procedure both destrys the glfw-native and
+;; the destroy window procedure both destroys the glfw-native and
 ;; removes the scheme version from it's table.
 ;; can be dangerous if there still are references to the
 ;; window in the code.
@@ -270,7 +278,8 @@ gsc  -cc-options "-framework Cocoa -lglfw3 -lGLEW -framework CoreVideo -framewor
 
 (define (glfw#window-attribute window attribute)
   (let ((glfw-window (get-glfw-window window)))
-    (glfw-native#get-window-attrib glfw-window attribute)));;(glfw-attribute-value->symbol (glfw-native#get-window-attrib glfw-window attribute))))
+    (glfw-native#get-window-attrib glfw-window attribute)))
+;;(glfw-attribute-value->symbol (glfw-native#get-window-attrib glfw-window attribute))))
 
 (define (glfw#window-show window)
   (glfw-native#show-window (get-glfw-window window)))
@@ -310,15 +319,13 @@ gsc  -cc-options "-framework Cocoa -lglfw3 -lGLEW -framework CoreVideo -framewor
   (let ((glfw-window (get-glfw-window window)))
     (glfw-native#set-window-pos glfw-window x-pos y-pos)))
 ;; we make window-pos-x-set and window-pos-y-set as well
-;: they do the same thing as window-pos-set but will take the other value from the allreade existing one
+;; they do the same thing as window-pos-set but will take the other value from the allreade existing one
 (define (glfw#window-position-x-set! window x-pos)
   (let ((glfw-window (get-glfw-window window)))
-    (glfw-native#set-window-pos glfw-window x-pos (glfw#window-position-y glfw-window)))
-  )
+    (glfw-native#set-window-pos glfw-window x-pos (glfw#window-position-y glfw-window))))
 (define (glfw#window-position-y-set! window y-pos)
   (let ((glfw-window (get-glfw-window window)))    
-    (glfw-native#set-window-pos glfw-window (glfw#window-position-x glfw-window) y-pos))
-  )
+    (glfw-native#set-window-pos glfw-window (glfw#window-position-x glfw-window) y-pos)))
 
 (define (glfw#window-size window)
   (let ((glfw-window (get-glfw-window window))
@@ -366,7 +373,7 @@ gsc  -cc-options "-framework Cocoa -lglfw3 -lGLEW -framework CoreVideo -framewor
   (let ((glfw-window (get-glfw-window window)))
     (glfw-native#get-monitor glfw-window)))
 
-#|| CLIPBOARD ||#
+#|| CLIPBOARD ||#
 (define (glfw#get-clipboard-string window)
   (let ((glfw-window (get-glfw-window window)))
     (glfw-native#get-clipboard-string glfw-window)))
@@ -379,7 +386,7 @@ gsc  -cc-options "-framework Cocoa -lglfw3 -lGLEW -framework CoreVideo -framewor
 (define (glfw#current-context #!optional new-context-window)
   (if new-context-window
       (begin (glfw-native#make-context-current (get-glfw-window new-context-window))
-        new-context-window)
+             new-context-window)
       (table-ref glfw#windows  (glfw-native#get-current-context) #f)))
 
 (define (glfw#window-swap-buffers window)
@@ -396,20 +403,21 @@ gsc  -cc-options "-framework Cocoa -lglfw3 -lGLEW -framework CoreVideo -framewor
 ;; meaning that the montior data format is the same as native
 
 (define glfw#get-monitors
-  (let ((glfw-get-monitor (c-lambda (GLFWmonitor** int) GLFWmonitor* "___result = ___arg1[___arg2];")))
-  (lambda ()
-  (let* ((count          (make-int* 0))
-         (output-list    (list))
-         (monitors-array (glfw-native#get-monitors count)))
-    (if (not (eq? (int*-value count) 0))
-        (begin
-          (let loop ((i (- (int*-value count) 1)))
-            (set! output-list (cons (glfw-get-monitor monitors-array i) output-list))
-            (if (not (eq? i 0)) (loop (- i 1)))
-            )
-          (int*-free count)
-          output-list
-          )'())))))
+  (let ((glfw-get-monitor (c-lambda (GLFWmonitor** int) GLFWmonitor*
+                                    "___result = ___arg1[___arg2];")))
+    (lambda ()
+      (let* ((count          (make-int* 0))
+             (output-list    (list))
+             (monitors-array (glfw-native#get-monitors count)))
+        (if (not (eq? (int*-value count) 0))
+            (begin
+              (let loop ((i (- (int*-value count) 1)))
+                (set! output-list (cons (glfw-get-monitor monitors-array i) output-list))
+                (if (not (eq? i 0)) (loop (- i 1)))
+                )
+              (int*-free count)
+              output-list
+              )'())))))
 
 (define (glfw#monitor-position monitor)
   (let ((x-pos (make-int* 0))
@@ -463,7 +471,8 @@ gsc  -cc-options "-framework Cocoa -lglfw3 -lGLEW -framework CoreVideo -framewor
 ;; i could be wrong about this
 (define glfw-monitor-on-callback-function #f)
 
-(c-define (glfw#on-monitor-connect/disconnect-cfun glfw-monitor connected?)(GLFWmonitor* bool) void "gambitGLFWonMontorCallback" ""
+(c-define (glfw#on-monitor-connect/disconnect-cfun glfw-monitor connected?)
+          (GLFWmonitor* bool) void "gambitGLFWonMontorCallback" ""
           (if glfw-monitor-on-callback-function
               (glfw-monitor-on-callback-function glfw-monitor connected?)
               )#f)

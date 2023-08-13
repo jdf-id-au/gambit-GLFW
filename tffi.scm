@@ -1,17 +1,12 @@
 (define-macro (c-constants #!rest body)
-
- (append '(begin) (map (lambda (constant-info)
-         (let (
-               (constant (if (list? constant-info) (car constant-info) constant-info))
-               (c-name   (symbol->string (if (list? constant-info) (or (list-ref constant-info 1) constant-info) constant-info)))
-               
-               )
-           `(define ,constant ((c-lambda () int ,(string-append "___result = " c-name";"))))
-           )
-
-         ) body))
-  
-  )
+  (append
+   '(begin)
+   (map (lambda (constant-info)
+          (let (
+                (constant (if (list? constant-info) (car constant-info) constant-info))
+                (c-name   (symbol->string (if (list? constant-info) (or (list-ref constant-info 1) constant-info) constant-info))))
+            `(define ,constant ((c-lambda () int ,(string-append "___result = " c-name";"))))))
+        body)))
 (c-define-type unsigned-int8*          (pointer unsigned-int8))
 (c-define-type unsigned-int16*         (pointer unsigned-int16))
 (c-define-type unsigned-int32*         (pointer unsigned-int32))
@@ -116,8 +111,6 @@ c-lambda-end
                               ))))
 (define u64vector->u64vector* (c-lambda (scheme-object) u64vector* "___result = ___BODY(___arg1);"))
 (define u64vector->unsigned-int64* (c-lambda (scheme-object unsigned-int) unsigned-int64* "___result = ___BODY(___arg1) + ___arg2;"))
-
-
 
 #|| SIGNED int VECTORS ||#
 (c-define-type s8vector*     (pointer int8))

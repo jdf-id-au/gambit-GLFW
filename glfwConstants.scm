@@ -2,14 +2,13 @@
 
 (declare 
  (block)
- (mostly-fixnum)
- )
+ (mostly-fixnum))
+
 (c-constants
-  #||--- Version info ---||#
+ #||--- Version info ---||#
  GLFW_VERSION_MAJOR 
  GLFW_VERSION_MINOR
- GLFW_VERSION_REVISION
- 
+ GLFW_VERSION_REVISION 
  
  #||--- ERROR CODES ---||#
  GLFW_NOT_INITIALIZED

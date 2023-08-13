@@ -20,11 +20,11 @@ Do it!
 To test, when compiled run: 
 # Schemified mode
 No program compilation needed ;)
-Copy paste the following into your gambit to test:
+Copy paste the following into your gambit to test (or see `example.scm`):
 ```scheme
 (load "glfw.o1")
 
-(define window (glfw#make-window 100 100))
+(define main-window (glfw#make-window 100 100 "hello"))
 (define should-quit? #f)
 
 (glfw#window-on-key-press-set! main-window
@@ -32,23 +32,21 @@ Copy paste the following into your gambit to test:
        (if (eq? in-key GLFW_KEY_0)
            (set! should-quit? #t))
        (let ((key (glfw-key->schmobj in-key))
-             (x-pos (glfw#window-position-x main-window))
-             (y-pos (glfw#window-position-y main-window)))
+             (x-pos (glfw#window-position-x window))
+             (y-pos (glfw#window-position-y window)))
              
          (print key)
          (newline)
          (case key
-           ((key-left)  (glfw#window-position-x-set! main-window (- x-pos 5)))
-           ((key-right) (glfw#window-position-x-set! main-window (+ x-pos 5)))
-           ((key-up)    (glfw#window-position-y-set! main-window (- y-pos 5)))
-           ((key-down)  (glfw#window-position-y-set! main-window (+ y-pos 5)))
-           ))))
+           ((key-left)  (glfw#window-position-x-set! window (- x-pos 5)))
+           ((key-right) (glfw#window-position-x-set! window (+ x-pos 5)))
+           ((key-up)    (glfw#window-position-y-set! window (- y-pos 5)))
+           ((key-down)  (glfw#window-position-y-set! window (+ y-pos 5)))))))
        
 (let loop ()
   (glfw-native#poll-events)
   (glfw#window-swap-buffers main-window)
-  (if should-quit? #f (loop))      
-  )
+  (if should-quit? #f (loop)))
 
 ```
 You Should now have a 100 x 100 black window (might be flimmering due to non cleared buffers...
@@ -67,7 +65,7 @@ press "0" to quit
 ```
 This should give you a 100 x 100 black window.
 
-To create functions compatible with the diffrent event handlers you must make c-defines such as:
+To create functions compatible with the different event handlers you must make c-defines such as:
 ```scheme
 (c-define (glfw#error-callback-procedure error-code error-msg)(int nonnull-UTF-8-string) void "gambitErrorCallback" ""
           (print "Glfw error-code: ")

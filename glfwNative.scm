@@ -13,23 +13,16 @@ gsc  -cc-options "-framework Cocoa -framework OpenGL -lglfw3 -framework CoreVide
 
 (declare 
  (block)
- (mostly-fixnum)
- )
-(c-declare #<<c-declare-end
-#include <GLFW/glfw3.h>
-
-c-declare-end
-) 
-
+ (mostly-fixnum))
+(c-declare "#include <GLFW/glfw3.h>") 
 
  #|| CONSTANTS ||#
-(include "glfwconstants.scm")
+(include "glfwConstants.scm")
 
-
-(c-define-type GLFWvidmode            (struct "GLFWvidmode" ))
+(c-define-type GLFWvidmode            (struct "GLFWvidmode"))
 (c-define-type GLFWvidmode*           (pointer GLFWvidmode))
 
-(c-define-type GLFWgammaramp            (struct "GLFWgammaramp" ))
+(c-define-type GLFWgammaramp            (struct "GLFWgammaramp"))
 (c-define-type GLFWgammaramp*           (pointer GLFWgammaramp))
 
 (c-define-type GLFWmonitor*            (pointer "GLFWmonitor"            GLFWmonitor* ))
@@ -37,7 +30,6 @@ c-declare-end
 (c-define-type GLFWwindow*             (pointer "GLFWwindow"             GLFWwindow*))
 
  #|| STRUCTS ||#
-
 ;; videomode
 (define glfw-native#videomode-width        (c-lambda (GLFWvidmode*) int "GLFWvidmode x = *___arg1;___result = x.width;"))
 (define glfw-native#videomode-height       (c-lambda (GLFWvidmode*) int "GLFWvidmode x = *___arg1;___result = x.height;"))
@@ -79,7 +71,6 @@ c-declare-end
 #|| Context functions ||#
 (c-define-type GLFWglproc             (function ()   void))
 
-
 #|| INIT AND VERSION INFO ||#
 (define glfw-native#init                        (c-lambda () bool  "glfwInit"));(lambda () (if (eq? (glfw-native#realInit) 1) #t #f)))
 
@@ -89,6 +80,7 @@ c-declare-end
 ;; version info
 (define glfw-native#get-version-info            (c-lambda ((pointer int) (pointer int) (pointer int)) void         "glfwGetVersion"))
 (define glfw-native#get-version-string          (c-lambda ()                                          char-string  "glfwGetVersionString"))
+
 #|| ERROR ||#
 (define glfw-native#set-error-callback          (c-lambda (GLFWerrorfun)                              GLFWerrorfun "glfwSetErrorCallback")) 
 
@@ -147,7 +139,7 @@ c-declare-end
 (define glfw-native#set-gamma-ramp             (c-lambda (GLFWmonitor*    GLFWgammaramp*)             void                 "glfwSetGammaRamp"))
 
 
-#|| FRAME BUFFEr ||#
+#|| FRAME BUFFER ||#
 
 (define glfw-native#get-frame-buffer-size (c-lambda (GLFWwindow* (pointer int) (pointer int)) void "glfwGetFramebufferSize"))
 ;; callbacks
@@ -195,6 +187,6 @@ c-declare-end
 ;; unecessary, we have gambit time but lets include the api anyhow
 (define    glfw-native#get-time         (c-lambda ()       double "glfwGetTime"))
 (define    glfw-native#set-time         (c-lambda (double) void   "glfwSetTime"))
+
 #|| NATIVE ACCESS ||# 
 ;; TODO
-
